@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import type { LatestStatus, LoadRecord, NodeInfo } from "../lib/api";
 import { getRecords } from "../lib/api";
-import { daysUntil, fmtBytes, fmtPercent, fmtSpeed, shortOs, trafficUsed } from "../lib/format";
+import {
+  daysUntil,
+  fmtBytes,
+  fmtPercent,
+  fmtSpeed,
+  shortOs,
+  trafficUsed,
+} from "../lib/format";
 import { fmtCycle, fmtDaysLeft, t } from "../lib/i18n";
 import { osIcon } from "../lib/osIcon";
 import type { ResolvedLatencySelection } from "../lib/latencySelection";
@@ -26,10 +33,16 @@ const canTilt =
 
 function tiltMove(e: React.MouseEvent<HTMLElement>) {
   if (!canTilt) return;
+
   const r = e.currentTarget.getBoundingClientRect();
   const px = (e.clientX - r.left) / r.width - 0.5;
   const py = (e.clientY - r.top) / r.height - 0.5;
-  e.currentTarget.style.transform = `perspective(900px) rotateX(${(-py * 3.5).toFixed(2)}deg) rotateY(${(px * 4.5).toFixed(2)}deg) translateY(-4px)`;
+
+  e.currentTarget.style.transform = `perspective(900px) rotateX(${(
+    -py * 3.5
+  ).toFixed(2)}deg) rotateY(${(px * 4.5).toFixed(
+    2,
+  )}deg) translateY(-4px)`;
 }
 
 function tiltLeave(e: React.MouseEvent<HTMLElement>) {
@@ -37,11 +50,26 @@ function tiltLeave(e: React.MouseEvent<HTMLElement>) {
 }
 
 const GRADS = {
-  cpu: { grad: "linear-gradient(90deg,#818cf8,#a78bfa)", color: "#8b7cf6" },
-  ram: { grad: "linear-gradient(90deg,#f472b6,#fb7185)", color: "#f4649e" },
-  disk: { grad: "linear-gradient(90deg,#fbbf24,#fb923c)", color: "#f59e2b" },
-  traffic: { grad: "linear-gradient(90deg,#38bdf8,#2dd4bf)", color: "#14b8c6" },
-  trafficHot: { grad: "linear-gradient(90deg,#fb7185,#f43f5e)", color: "#f43f5e" },
+  cpu: {
+    grad: "linear-gradient(90deg,#818cf8,#a78bfa)",
+    color: "#8b7cf6",
+  },
+  ram: {
+    grad: "linear-gradient(90deg,#f472b6,#fb7185)",
+    color: "#f4649e",
+  },
+  disk: {
+    grad: "linear-gradient(90deg,#fbbf24,#fb923c)",
+    color: "#f59e2b",
+  },
+  traffic: {
+    grad: "linear-gradient(90deg,#38bdf8,#2dd4bf)",
+    color: "#14b8c6",
+  },
+  trafficHot: {
+    grad: "linear-gradient(90deg,#fb7185,#f43f5e)",
+    color: "#f43f5e",
+  },
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -77,8 +105,13 @@ function Bar({
     <div>
       <div className="flex items-baseline justify-between mb-1">
         <span className="text-[12px] text-dim">{label}</span>
-        <span className="text-[13px] font-semibold num" style={{ color }}>
+
+        <span
+          className="text-[13px] font-semibold num"
+          style={{ color }}
+        >
           {pct.toFixed(pct >= 10 ? 0 : 1)}%
+
           {sub && (
             <span className="text-dim font-normal text-[11px]">
               {" "}
@@ -123,6 +156,7 @@ function ConnectionsRow({
           <span className="connection-protocol">
             {t("tcp")}
           </span>
+
           <strong style={{ color: "#8b7cf6" }}>
             {formatCount(tcp)}
           </strong>
@@ -136,6 +170,7 @@ function ConnectionsRow({
           <span className="connection-protocol">
             {t("udp")}
           </span>
+
           <strong style={{ color: "#14b8c6" }}>
             {formatCount(udp)}
           </strong>
@@ -223,7 +258,9 @@ function cumulativeDelta(
 
   let previous = Math.max(
     0,
-    Number(sorted[baselineIndex][key]) || 0,
+    Number(
+      sorted[baselineIndex][key],
+    ) || 0,
   );
 
   let total = 0;
@@ -266,14 +303,16 @@ function cycleTrafficFromRecords(
 
   const inCycle = records.filter(
     (r) =>
-      new Date(r.time).getTime() >= startMs,
+      new Date(r.time).getTime() >=
+      startMs,
   );
 
-  const hasDeltaTraffic = inCycle.some(
-    (r) =>
-      Number(r.traffic_up || 0) > 0 ||
-      Number(r.traffic_down || 0) > 0,
-  );
+  const hasDeltaTraffic =
+    inCycle.some(
+      (r) =>
+        Number(r.traffic_up || 0) > 0 ||
+        Number(r.traffic_down || 0) > 0,
+    );
 
   if (hasDeltaTraffic) {
     const up = inCycle.reduce(
@@ -303,15 +342,16 @@ function cycleTrafficFromRecords(
     );
   }
 
-  const hasCounters = records.some(
-    (r) =>
-      Number.isFinite(
-        Number(r.net_total_up),
-      ) ||
-      Number.isFinite(
-        Number(r.net_total_down),
-      ),
-  );
+  const hasCounters =
+    records.some(
+      (r) =>
+        Number.isFinite(
+          Number(r.net_total_up),
+        ) ||
+        Number.isFinite(
+          Number(r.net_total_down),
+        ),
+    );
 
   if (!hasCounters) return null;
 
@@ -338,10 +378,11 @@ function useCycleTraffic(
   const [value, setValue] =
     useState<number | null>(null);
 
-  const resetDay = normalizedResetDay(
-    node.tags,
-    defaultResetDay,
-  );
+  const resetDay =
+    normalizedResetDay(
+      node.tags,
+      defaultResetDay,
+    );
 
   useEffect(() => {
     if (!node.traffic_limit) {
@@ -354,9 +395,8 @@ function useCycleTraffic(
 
     const load = async () => {
       try {
-        const start = cycleStart(
-          resetDay,
-        );
+        const start =
+          cycleStart(resetDay);
 
         const hours = Math.min(
           24 * 35,
@@ -370,10 +410,11 @@ function useCycleTraffic(
           ),
         );
 
-        const response = await getRecords(
-          node.uuid,
-          hours,
-        );
+        const response =
+          await getRecords(
+            node.uuid,
+            hours,
+          );
 
         if (!stopped) {
           setValue(
@@ -391,20 +432,22 @@ function useCycleTraffic(
       }
 
       if (!stopped) {
-        timer = window.setTimeout(
-          load,
-          5 * 60 * 1000,
-        );
+        timer =
+          window.setTimeout(
+            load,
+            5 * 60 * 1000,
+          );
       }
     };
 
-    timer = window.setTimeout(
-      load,
-      Math.min(
-        250 + index * 80,
-        2500,
-      ),
-    );
+    timer =
+      window.setTimeout(
+        load,
+        Math.min(
+          250 + index * 80,
+          2500,
+        ),
+      );
 
     return () => {
       stopped = true;
@@ -439,7 +482,9 @@ function currencySymbol(
 function billingText(
   node: NodeInfo,
 ): string | null {
-  const price = Number(node.price);
+  const price = Number(
+    node.price,
+  );
 
   if (
     !Number.isFinite(price) ||
@@ -448,9 +493,8 @@ function billingText(
     return null;
   }
 
-  const cycleDays = Number(
-    node.billing_cycle,
-  );
+  const cycleDays =
+    Number(node.billing_cycle);
 
   const cycle =
     Number.isFinite(cycleDays) &&
@@ -489,99 +533,71 @@ function onlineDays(
    TAG 自动颜色
    ===================================================== */
 
-/*
- * TAG 颜色规则：
- *
- * 后台只需要正常填写：
- *
- * 1Gbps,马来西亚
- * 300Mbps,法兰克福
- * 1Gbps,拉斯维加斯
- *
- * 不需要写 #颜色。
- *
- * 带宽 → 根据带宽自动配色
- * 国家/城市 → 根据所属国家自动配色
- * 未识别 → 灰色
- */
+function tagColor(
+  tag: string,
+): string {
+  const value =
+    tag.trim().toLowerCase();
 
-function tagColor(tag: string): string {
-  const value = tag.trim().toLowerCase();
-
-  /* =========================
-     带宽
-     ========================= */
+  /* 带宽 */
 
   if (
     value.includes("10gbps")
-  ) {
+  )
     return "#f43f5e";
-  }
 
   if (
     value.includes("5gbps")
-  ) {
+  )
     return "#ef4444";
-  }
 
   if (
     value.includes("2.5gbps")
-  ) {
+  )
     return "#ec4899";
-  }
 
   if (
     value.includes("1gbps") ||
     value.includes("1000mbps")
-  ) {
+  )
     return "#3b82f6";
-  }
 
   if (
     value.includes("500mbps")
-  ) {
+  )
     return "#8b5cf6";
-  }
 
   if (
     value.includes("300mbps")
-  ) {
+  )
     return "#a855f7";
-  }
 
   if (
     value.includes("200mbps")
-  ) {
+  )
     return "#c026d3";
-  }
 
   if (
     value.includes("100mbps")
-  ) {
+  )
     return "#7c3aed";
-  }
 
   if (
     value.includes("50mbps")
-  ) {
+  )
     return "#14b8a6";
-  }
 
   if (
     value.includes("20mbps")
-  ) {
+  )
     return "#10b981";
-  }
 
   if (
     value.includes("10mbps")
-  ) {
+  )
     return "#22c55e";
-  }
 
-  /* =========================
-     中国
-     ========================= */
+  /* 中国 */
 
   if (
     value.includes("中国") ||
@@ -600,48 +616,35 @@ function tagColor(tag: string): string {
     value.includes("西安") ||
     value.includes("青岛") ||
     value.includes("天津")
-  ) {
+  )
     return "#f59e0b";
-  }
 
-  /* =========================
-     香港
-     ========================= */
+  /* 香港 */
 
   if (
     value.includes("香港") ||
-    value.includes("香港") ||
     value.includes("九龙")
-  ) {
+  )
     return "#ef4444";
-  }
 
-  /* =========================
-     澳门
-     ========================= */
+  /* 澳门 */
 
   if (
     value.includes("澳门")
-  ) {
+  )
     return "#16a34a";
-  }
 
-  /* =========================
-     台湾
-     ========================= */
+  /* 台湾 */
 
   if (
     value.includes("台湾") ||
     value.includes("台北") ||
     value.includes("台中") ||
     value.includes("高雄")
-  ) {
+  )
     return "#2563eb";
-  }
 
-  /* =========================
-     日本
-     ========================= */
+  /* 日本 */
 
   if (
     value.includes("日本") ||
@@ -652,13 +655,10 @@ function tagColor(tag: string): string {
     value.includes("京都") ||
     value.includes("福冈") ||
     value.includes("札幌")
-  ) {
+  )
     return "#dc2626";
-  }
 
-  /* =========================
-     韩国
-     ========================= */
+  /* 韩国 */
 
   if (
     value.includes("韩国") ||
@@ -666,23 +666,17 @@ function tagColor(tag: string): string {
     value.includes("釜山") ||
     value.includes("仁川") ||
     value.includes("大田")
-  ) {
+  )
     return "#2563eb";
-  }
 
-  /* =========================
-     新加坡
-     ========================= */
+  /* 新加坡 */
 
   if (
     value.includes("新加坡")
-  ) {
+  )
     return "#f97316";
-  }
 
-  /* =========================
-     马来西亚
-     ========================= */
+  /* 马来西亚 */
 
   if (
     value.includes("马来西亚") ||
@@ -690,62 +684,47 @@ function tagColor(tag: string): string {
     value.includes("槟城") ||
     value.includes("柔佛") ||
     value.includes("新山")
-  ) {
+  )
     return "#16a34a";
-  }
 
-  /* =========================
-     泰国
-     ========================= */
+  /* 泰国 */
 
   if (
     value.includes("泰国") ||
     value.includes("曼谷") ||
     value.includes("清迈")
-  ) {
+  )
     return "#7c3aed";
-  }
 
-  /* =========================
-     越南
-     ========================= */
+  /* 越南 */
 
   if (
     value.includes("越南") ||
     value.includes("河内") ||
     value.includes("胡志明") ||
     value.includes("岘港")
-  ) {
+  )
     return "#dc2626";
-  }
 
-  /* =========================
-     菲律宾
-     ========================= */
+  /* 菲律宾 */
 
   if (
     value.includes("菲律宾") ||
     value.includes("马尼拉")
-  ) {
+  )
     return "#0891b2";
-  }
 
-  /* =========================
-     印度尼西亚
-     ========================= */
+  /* 印度尼西亚 */
 
   if (
     value.includes("印度尼西亚") ||
     value.includes("印尼") ||
     value.includes("雅加达") ||
     value.includes("泗水")
-  ) {
+  )
     return "#ea580c";
-  }
 
-  /* =========================
-     美国
-     ========================= */
+  /* 美国 */
 
   if (
     value.includes("美国") ||
@@ -764,13 +743,10 @@ function tagColor(tag: string): string {
     value.includes("休斯顿") ||
     value.includes("丹佛") ||
     value.includes("凤凰城")
-  ) {
+  )
     return "#2563eb";
-  }
 
-  /* =========================
-     加拿大
-     ========================= */
+  /* 加拿大 */
 
   if (
     value.includes("加拿大") ||
@@ -778,13 +754,10 @@ function tagColor(tag: string): string {
     value.includes("温哥华") ||
     value.includes("蒙特利尔") ||
     value.includes("卡尔加里")
-  ) {
+  )
     return "#dc2626";
-  }
 
-  /* =========================
-     德国
-     ========================= */
+  /* 德国 */
 
   if (
     value.includes("德国") ||
@@ -796,26 +769,20 @@ function tagColor(tag: string): string {
     value.includes("杜塞尔多夫") ||
     value.includes("斯图加特") ||
     value.includes("科隆")
-  ) {
+  )
     return "#8b5cf6";
-  }
 
-  /* =========================
-     法国
-     ========================= */
+  /* 法国 */
 
   if (
     value.includes("法国") ||
     value.includes("巴黎") ||
     value.includes("马赛") ||
     value.includes("里昂")
-  ) {
+  )
     return "#2563eb";
-  }
 
-  /* =========================
-     英国
-     ========================= */
+  /* 英国 */
 
   if (
     value.includes("英国") ||
@@ -823,71 +790,53 @@ function tagColor(tag: string): string {
     value.includes("曼彻斯特") ||
     value.includes("伯明翰") ||
     value.includes("爱丁堡")
-  ) {
+  )
     return "#dc2626";
-  }
 
-  /* =========================
-     荷兰
-     ========================= */
+  /* 荷兰 */
 
   if (
     value.includes("荷兰") ||
     value.includes("阿姆斯特丹") ||
     value.includes("鹿特丹")
-  ) {
+  )
     return "#f97316";
-  }
 
-  /* =========================
-     芬兰
-     ========================= */
+  /* 芬兰 */
 
   if (
     value.includes("芬兰") ||
     value.includes("赫尔辛基")
-  ) {
+  )
     return "#0284c7";
-  }
 
-  /* =========================
-     瑞典
-     ========================= */
+  /* 瑞典 */
 
   if (
     value.includes("瑞典") ||
     value.includes("斯德哥尔摩")
-  ) {
+  )
     return "#eab308";
-  }
 
-  /* =========================
-     瑞士
-     ========================= */
+  /* 瑞士 */
 
   if (
     value.includes("瑞士") ||
     value.includes("苏黎世") ||
     value.includes("日内瓦")
-  ) {
+  )
     return "#dc2626";
-  }
 
-  /* =========================
-     俄罗斯
-     ========================= */
+  /* 俄罗斯 */
 
   if (
     value.includes("俄罗斯") ||
     value.includes("莫斯科") ||
     value.includes("圣彼得堡")
-  ) {
+  )
     return "#7c3aed";
-  }
 
-  /* =========================
-     澳大利亚
-     ========================= */
+  /* 澳大利亚 */
 
   if (
     value.includes("澳大利亚") ||
@@ -896,25 +845,19 @@ function tagColor(tag: string): string {
     value.includes("墨尔本") ||
     value.includes("布里斯班") ||
     value.includes("珀斯")
-  ) {
+  )
     return "#0284c7";
-  }
 
-  /* =========================
-     新西兰
-     ========================= */
+  /* 新西兰 */
 
   if (
     value.includes("新西兰") ||
     value.includes("奥克兰") ||
     value.includes("惠灵顿")
-  ) {
+  )
     return "#16a34a";
-  }
 
-  /* =========================
-     印度
-     ========================= */
+  /* 印度 */
 
   if (
     value.includes("印度") ||
@@ -922,39 +865,98 @@ function tagColor(tag: string): string {
     value.includes("新德里") ||
     value.includes("班加罗尔") ||
     value.includes("海得拉巴")
-  ) {
+  )
     return "#f97316";
-  }
 
-  /* =========================
-     土耳其
-     ========================= */
+  /* 土耳其 */
 
   if (
     value.includes("土耳其") ||
     value.includes("伊斯坦布尔") ||
     value.includes("安卡拉")
-  ) {
+  )
     return "#dc2626";
-  }
 
-  /* =========================
-     巴西
-     ========================= */
+  /* 巴西 */
 
   if (
     value.includes("巴西") ||
     value.includes("圣保罗") ||
     value.includes("里约热内卢")
-  ) {
+  )
     return "#16a34a";
-  }
 
-  /* =========================
-     默认
-     ========================= */
+  /* 默认 */
 
   return "#94a3b8";
+}
+
+/* =====================================================
+   TAG 解析
+   ===================================================== */
+
+function parseTags(
+  value: string,
+): {
+  label: string;
+  color: string;
+}[] {
+  return (value || "")
+    .split(/[;,]/)
+    .map((s) => s.trim())
+    .filter(
+      (s) =>
+        Boolean(s) &&
+        !/^traffic-reset\s*:/i.test(
+          s,
+        ),
+    )
+    .slice(0, 3)
+    .map((tag) => {
+      /*
+       * 支持：
+       *
+       * 1Gbps
+       * 1Gbps#3b82f6
+       * 1Gbps3b82f6
+       *
+       * 后两种都会自动去掉颜色代码。
+       */
+
+      const customColor =
+        tag.match(
+          /#([0-9a-fA-F]{6})$/,
+        ) ||
+        tag.match(
+          /([0-9a-fA-F]{6})$/,
+        );
+
+      if (
+        customColor &&
+        customColor.index !==
+          undefined
+      ) {
+        const index =
+          customColor.index;
+
+        const label =
+          tag
+            .slice(0, index)
+            .trim();
+
+        if (label) {
+          return {
+            label,
+            color: `#${customColor[1]}`,
+          };
+        }
+      }
+
+      return {
+        label: tag,
+        color: tagColor(tag),
+      };
+    });
 }
 
 export default function NodeCard({
@@ -967,10 +969,14 @@ export default function NodeCard({
   trafficResetDay,
   onClick,
 }: Props) {
-  const online = !!status?.online;
+  const online =
+    !!status?.online;
 
   const cpu = status
-    ? Math.min(100, status.cpu)
+    ? Math.min(
+        100,
+        status.cpu,
+      )
     : 0;
 
   const ramPct = status
@@ -1008,7 +1014,8 @@ export default function NodeCard({
     : 0;
 
   const trafficUse =
-    cycleTraffic ?? rawTraffic;
+    cycleTraffic ??
+    rawTraffic;
 
   const trafficPct =
     trafficLimit > 0
@@ -1026,7 +1033,9 @@ export default function NodeCard({
       : GRADS.traffic;
 
   const expDays =
-    daysUntil(node.expired_at);
+    daysUntil(
+      node.expired_at,
+    );
 
   const expSoon =
     expDays !== null &&
@@ -1035,32 +1044,8 @@ export default function NodeCard({
   const billing =
     billingText(node);
 
-  /*
-   * TAG：
-   *
-   * 后台：
-   * 1Gbps,马来西亚
-   *
-   * 或：
-   * 300Mbps,法兰克福
-   *
-   * 前端自动按照带宽 / 国家 / 城市配色。
-   */
-  const tags = (node.tags || "")
-    .split(/[;,]/)
-    .map((s) => s.trim())
-    .filter(
-      (s) =>
-        Boolean(s) &&
-        !/^traffic-reset\s*:/i.test(
-          s,
-        ),
-    )
-    .slice(0, 3)
-    .map((tag) => ({
-      label: tag,
-      color: tagColor(tag),
-    }));
+  const tags =
+    parseTags(node.tags);
 
   return (
     <article
@@ -1232,7 +1217,9 @@ export default function NodeCard({
 
       {online && status && (
         <ConnectionsRow
-          tcp={status.connections}
+          tcp={
+            status.connections
+          }
           udp={
             status.connections_udp
           }
@@ -1261,7 +1248,8 @@ export default function NodeCard({
             <span className="whitespace-nowrap">
               <span
                 style={{
-                  color: "#fb7185",
+                  color:
+                    "#fb7185",
                 }}
               >
                 ↑
@@ -1274,7 +1262,8 @@ export default function NodeCard({
             <span className="whitespace-nowrap">
               <span
                 style={{
-                  color: "#2dd4bf",
+                  color:
+                    "#2dd4bf",
                 }}
               >
                 ↓
@@ -1294,6 +1283,7 @@ export default function NodeCard({
       {(tags.length > 0 ||
         expSoon) && (
         <div className="node-card-tags flex items-center gap-1.5 mt-2.5 flex-wrap">
+
           {expSoon && (
             <span
               className="text-[10.5px] px-2 py-0.5 rounded-full font-medium"
@@ -1302,8 +1292,10 @@ export default function NodeCard({
                   expDays! <= 3
                     ? "#fb7185"
                     : "#f59e0b",
+
                 background:
                   "var(--chip)",
+
                 border: `1px solid ${
                   expDays! <= 3
                     ? "rgba(251,113,133,0.45)"
@@ -1326,14 +1318,31 @@ export default function NodeCard({
               style={{
                 background:
                   "var(--chip)",
+
                 border:
                   "1px solid var(--glass-border)",
-                color: tag.color,
+
+                /*
+                 * TAG 文字统一使用主题颜色。
+                 * 暗色模式下就是白色/浅色。
+                 */
+                color:
+                  "var(--text)",
               }}
             >
+              {/* TAG 左侧彩色小圆点 */}
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
+                style={{
+                  background:
+                    tag.color,
+                }}
+              />
+
               {tag.label}
             </span>
           ))}
+
         </div>
       )}
     </article>
