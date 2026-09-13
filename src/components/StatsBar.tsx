@@ -17,8 +17,11 @@ function Item({
 }) {
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
-      <span className="text-[11px] tracking-wide text-dim">{label}</span>
-      <span className="text-[15px] font-semibold num whitespace-nowrap">
+      <span className="text-[11px] tracking-wide text-dim">
+        {label}
+      </span>
+
+      <span className="text-[15px] font-semibold num whitespace-nowrap text-center">
         {children}
       </span>
     </div>
@@ -30,11 +33,15 @@ export default function StatsBar({ nodes, latest }: Props) {
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
+
     return () => clearInterval(id);
   }, []);
 
   const online = nodes.filter((n) => latest[n.uuid]?.online);
-  const regions = new Set(nodes.map((n) => n.region || "🏳️")).size;
+
+  const regions = new Set(
+    nodes.map((n) => n.region || "🏳️")
+  ).size;
 
   let up = 0;
   let down = 0;
@@ -67,8 +74,14 @@ export default function StatsBar({ nodes, latest }: Props) {
       </Item>
 
       <Item label={t("currentOnline")}>
-        <span style={{ color: "#34d399" }}>{online.length}</span>
-        <span className="text-dim"> / {nodes.length}</span>
+        <span style={{ color: "#34d399" }}>
+          {online.length}
+        </span>
+
+        <span className="text-dim">
+          {" / "}
+          {nodes.length}
+        </span>
       </Item>
 
       <Item label={t("regions")}>
@@ -76,16 +89,24 @@ export default function StatsBar({ nodes, latest }: Props) {
       </Item>
 
       <Item label={t("totalTraffic")}>
-        <span className="text-dim text-[13px]">↑</span>{" "}
+        <span className="text-dim text-[13px]">
+          ↑
+        </span>{" "}
         {fmtBytes(totalUp)}{" "}
-        <span className="text-dim text-[13px]">↓</span>{" "}
+        <span className="text-dim text-[13px]">
+          ↓
+        </span>{" "}
         {fmtBytes(totalDown)}
       </Item>
 
       <Item label={t("netSpeed")}>
-        <span className="text-dim text-[13px]">↑</span>{" "}
+        <span className="text-dim text-[13px]">
+          ↑
+        </span>{" "}
         {fmtSpeed(up)}{" "}
-        <span className="text-dim text-[13px]">↓</span>{" "}
+        <span className="text-dim text-[13px]">
+          ↓
+        </span>{" "}
         {fmtSpeed(down)}
       </Item>
     </div>
