@@ -7,6 +7,7 @@ import Background from "./components/Background";
 import StatsBar from "./components/StatsBar";
 import NodeCard from "./components/NodeCard";
 import LatencyTaskSelector from "./components/LatencyTaskSelector";
+import VisitorInfo from "./components/VisitorInfo";
 import {
   clearStoredSelections,
   parseThemeSelections,
@@ -148,6 +149,15 @@ export default function App() {
 
   const latencyPickerEnabled =
     latencyPickerSetting !== false && latencyPickerSetting !== "false";
+
+  // 访问 IP
+  const visitorIpSetting = settings.showVisitorIp;
+
+  const showVisitorIp =
+    visitorIpSetting !== false && visitorIpSetting !== "false";
+
+  const visitorIpEndpoint =
+    (settings.visitorIpEndpoint as string) || "";
 
   const resetDayRaw = Number(settings.trafficResetDay ?? 1);
 
@@ -389,6 +399,14 @@ export default function App() {
               onClick={() => setSelected(n)}
             />
           ))}
+        </div>
+
+        {/* 访问 IP：保留；底部版权信息已删除 */}
+        <div className="site-footer mt-10">
+          <VisitorInfo
+            enabled={showVisitorIp}
+            endpoint={visitorIpEndpoint}
+          />
         </div>
       </div>
 
