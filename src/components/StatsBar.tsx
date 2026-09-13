@@ -16,12 +16,12 @@ function Item({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+    <div className="flex flex-col items-center gap-0.5 min-w-0 text-center">
       <span className="text-[11px] tracking-wide text-dim">
         {label}
       </span>
 
-      <span className="text-[15px] font-semibold num whitespace-nowrap text-center">
+      <span className="text-[15px] font-semibold num whitespace-nowrap">
         {children}
       </span>
     </div>
@@ -77,7 +77,6 @@ export default function StatsBar({ nodes, latest }: Props) {
         <span style={{ color: "#34d399" }}>
           {online.length}
         </span>
-
         <span className="text-dim">
           {" / "}
           {nodes.length}
@@ -89,24 +88,16 @@ export default function StatsBar({ nodes, latest }: Props) {
       </Item>
 
       <Item label={t("totalTraffic")}>
-        <span className="text-dim text-[13px]">
-          ↑
-        </span>{" "}
+        <span className="text-dim text-[13px]">↑</span>{" "}
         {fmtBytes(totalUp)}{" "}
-        <span className="text-dim text-[13px]">
-          ↓
-        </span>{" "}
+        <span className="text-dim text-[13px]">↓</span>{" "}
         {fmtBytes(totalDown)}
       </Item>
 
       <Item label={t("netSpeed")}>
-        <span className="text-dim text-[13px]">
-          ↑
-        </span>{" "}
+        <span className="text-dim text-[13px]">↑</span>{" "}
         {fmtSpeed(up)}{" "}
-        <span className="text-dim text-[13px]">
-          ↓
-        </span>{" "}
+        <span className="text-dim text-[13px]">↓</span>{" "}
         {fmtSpeed(down)}
       </Item>
     </div>
