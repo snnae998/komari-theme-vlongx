@@ -7,7 +7,6 @@ import Background from "./components/Background";
 import StatsBar from "./components/StatsBar";
 import NodeCard from "./components/NodeCard";
 import LatencyTaskSelector from "./components/LatencyTaskSelector";
-import VisitorInfo from "./components/VisitorInfo";
 import {
   clearStoredSelections,
   parseThemeSelections,
@@ -28,7 +27,13 @@ const DEFAULT_WALL_NIGHT = "/wallpaper-night.svg";
 
 function autoMode(tz: string): Mode {
   try {
-    const h = Number(new Date().toLocaleString("en", { timeZone: tz, hour: "numeric", hour12: false }));
+    const h = Number(
+      new Date().toLocaleString("en", {
+        timeZone: tz,
+        hour: "numeric",
+        hour12: false,
+      }),
+    );
     return h >= 18 || h < 6 ? "night" : "day";
   } catch {
     return "day";
@@ -41,11 +46,13 @@ function useMode(tz: string): [Mode, () => void] {
     document.documentElement.dataset.mode = m;
     return m;
   });
+
   useEffect(() => {
     const m = autoMode(tz);
     document.documentElement.dataset.mode = m;
     setMode(m);
   }, [tz]);
+
   const toggle = useCallback(() => {
     setMode((m) => {
       const next = m === "day" ? "night" : "day";
@@ -53,12 +60,17 @@ function useMode(tz: string): [Mode, () => void] {
       return next;
     });
   }, []);
+
   return [mode, toggle];
 }
 
 export default function App() {
   const [pub, setPub] = useState<PublicInfo | null>(null);
-  const tz = ((pub?.theme_settings ?? {}) as Record<string, unknown>).timezone as string || "Asia/Shanghai";
+
+  const tz =
+    ((pub?.theme_settings ?? {}) as Record<string, unknown>).timezone as string ||
+    "Asia/Shanghai";
+
   const [mode, toggleMode] = useMode(tz);
   const [nodes, setNodes] = useState<NodeInfo[]>([]);
   const [latest, setLatest] = useState<Record<string, LatestStatus>>({});
@@ -71,10 +83,13 @@ export default function App() {
   const latencySelectionInitialized = useRef(false);
 
   useEffect(() => {
-    getPublicInfo().then((p) => {
-      setPub(p);
-      if (p.sitename) document.title = p.sitename;
-    }).catch(() => {});
+    getPublicInfo()
+      .then((p) => {
+        setPub(p);
+        if (p.sitename) document.title = p.sitename;
+      })
+      .catch(() => {});
+
     getNodes().then(setNodes).catch(() => {});
     getPingTasks().then(setPingTasks).catch(() => {});
   }, []);
@@ -82,8 +97,10 @@ export default function App() {
   useEffect(() => {
     let stop = false;
     let timer: number | undefined;
+
     const tick = async () => {
       if (stop) return;
+
       if (!document.hidden) {
         try {
           setLatest(await getLatest());
@@ -91,16 +108,21 @@ export default function App() {
           /* transient network error: keep last data */
         }
       }
+
       timer = window.setTimeout(tick, 2000);
     };
+
     tick();
+
     const onVis = () => {
       if (!document.hidden) {
         window.clearTimeout(timer);
         tick();
       }
     };
+
     document.addEventListener("visibilitychange", onVis);
+
     return () => {
       stop = true;
       window.clearTimeout(timer);
@@ -109,101 +131,171 @@ export default function App() {
   }, []);
 
   const settings = (pub?.theme_settings ?? {}) as Record<string, unknown>;
+
   const cfgDay = (settings.wallpaperDay as string) || "";
   const cfgNight = (settings.wallpaperNight as string) || "";
+
   const wallDay = cfgDay || cfgNight || DEFAULT_WALL_DAY;
   const wallNight = cfgNight || cfgDay || DEFAULT_WALL_NIGHT;
-  const showLatencySetting = settings.showLatencyOnCard ?? settings.showTcpingOnCard;
-  const showLatency = showLatencySetting !== false && showLatencySetting !== "false";
+
+  const showLatencySetting =
+    settings.showLatencyOnCard ?? settings.showTcpingOnCard;
+
+  const showLatency =
+    showLatencySetting !== false && showLatencySetting !== "false";
+
   const latencyPickerSetting = settings.latencyPickerEnabled;
-  const latencyPickerEnabled = latencyPickerSetting !== false && latencyPickerSetting !== "false";
-  const visitorIpSetting = settings.showVisitorIp;
-  const showVisitorIp = visitorIpSetting !== false && visitorIpSetting !== "false";
-  const visitorIpEndpoint = (settings.visitorIpEndpoint as string) || "";
+
+  const latencyPickerEnabled =
+    latencyPickerSetting !== false && latencyPickerSetting !== "false";
+
   const resetDayRaw = Number(settings.trafficResetDay ?? 1);
+
   const trafficResetDay = Number.isFinite(resetDayRaw)
     ? Math.max(1, Math.min(28, Math.round(resetDayRaw)))
     : 1;
+
   const themeLatencySelections = useMemo(
-    () => parseThemeSelections(settings.latencyDefaultTasks, settings.latencyDefaultAliases, pingTasks),
-    [settings.latencyDefaultTasks, settings.latencyDefaultAliases, pingTasks],
+    () =>
+      parseThemeSelections(
+        settings.latencyDefaultTasks,
+        settings.latencyDefaultAliases,
+        pingTasks,
+      ),
+    [
+      settings.latencyDefaultTasks,
+      settings.latencyDefaultAliases,
+      pingTasks,
+    ],
   );
+
   const resolvedLatencySelections = useMemo(
     () => resolveSelections(latencySelections, pingTasks),
     [latencySelections, pingTasks],
   );
+
   const resolvedAllLatencyTasks = useMemo(
     () => resolveAllTasks(pingTasks),
     [pingTasks],
   );
-  setLossSensitivity((settings.lossSensitivity as string) || "Standard");
-  const offlinePos = ((settings.offlinePosition as string) || "Last").toLowerCase();
+
+  setLossSensitivity(
+    (settings.lossSensitivity as string) || "Standard",
+  );
+
+  const offlinePos =
+    ((settings.offlinePosition as string) || "Last").toLowerCase();
 
   useEffect(() => {
-    if (!pub || pingTasks.length === 0 || latencySelectionInitialized.current) return;
+    if (
+      !pub ||
+      pingTasks.length === 0 ||
+      latencySelectionInitialized.current
+    ) {
+      return;
+    }
+
     const stored = readStoredSelections();
+
     setLatencySelections(
       stored === null
         ? themeLatencySelections
         : sanitizeSelections(stored, pingTasks),
     );
+
     latencySelectionInitialized.current = true;
   }, [pub, pingTasks, themeLatencySelections]);
 
   useEffect(() => {
-    if (!latencySelectionInitialized.current || pingTasks.length === 0) return;
-    setLatencySelections((current) => sanitizeSelections(current, pingTasks));
+    if (!latencySelectionInitialized.current || pingTasks.length === 0) {
+      return;
+    }
+
+    setLatencySelections((current) =>
+      sanitizeSelections(current, pingTasks),
+    );
   }, [pingTasks]);
 
   const groups = useMemo(() => {
     const gs = new Set<string>();
-    for (const n of nodes) if (n.group) gs.add(n.group);
+
+    for (const n of nodes) {
+      if (n.group) gs.add(n.group);
+    }
+
     return Array.from(gs);
   }, [nodes]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
+
     let list = nodes.filter((n) => !n.hidden);
-    if (group) list = list.filter((n) => n.group === group);
+
+    if (group) {
+      list = list.filter((n) => n.group === group);
+    }
+
     if (q) {
       list = list.filter((n) =>
-        `${n.name} ${n.region} ${n.os} ${n.tags}`.toLowerCase().includes(q),
+        `${n.name} ${n.region} ${n.os} ${n.tags}`
+          .toLowerCase()
+          .includes(q),
       );
     }
+
     const byWeight = (a: NodeInfo, b: NodeInfo) =>
       a.weight - b.weight || a.name.localeCompare(b.name);
-    if (offlinePos === "keep") return list.sort(byWeight);
-    const rank = (n: NodeInfo) => (latest[n.uuid]?.online ? 0 : 1);
+
+    if (offlinePos === "keep") {
+      return list.sort(byWeight);
+    }
+
+    const rank = (n: NodeInfo) =>
+      latest[n.uuid]?.online ? 0 : 1;
+
     return list.sort((a, b) => {
       const d = rank(a) - rank(b);
-      return offlinePos === "first" ? -d || byWeight(a, b) : d || byWeight(a, b);
+
+      return offlinePos === "first"
+        ? -d || byWeight(a, b)
+        : d || byWeight(a, b);
     });
   }, [nodes, latest, query, group, offlinePos]);
 
   return (
     <>
-      <Background mode={mode} wallpaperDay={wallDay} wallpaperNight={wallNight} />
+      <Background
+        mode={mode}
+        wallpaperDay={wallDay}
+        wallpaperNight={wallNight}
+      />
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 pb-10">
         <header className="flex items-center gap-3 py-5">
           <h1 className="text-[22px] font-bold tracking-tight flex-1">
             {pub?.sitename || "Komari"}
+
             <span
               className="inline-block w-2 h-2 rounded-full ml-2 align-middle"
               style={{ background: "var(--accent)" }}
             />
           </h1>
+
           {latencyPickerEnabled && (
             <button
               onClick={() => setLatencySelectorOpen(true)}
               className="glass latency-picker-trigger rounded-full h-10 px-3.5 flex items-center gap-2 text-[12px] cursor-pointer card-hover"
-              aria-label={"configure latency tasks"}
-              title={"Homepage latency tasks"}
+              aria-label="configure latency tasks"
+              title="Homepage latency tasks"
             >
               <span aria-hidden>⌁</span>
-              <span>{t("latency")} {resolvedLatencySelections.length}/3</span>
+
+              <span>
+                {t("latency")} {resolvedLatencySelections.length}/3
+              </span>
             </button>
           )}
+
           <button
             onClick={toggleMode}
             className="glass rounded-full w-10 h-10 grid place-items-center text-[17px] cursor-pointer card-hover"
@@ -216,7 +308,10 @@ export default function App() {
           </button>
         </header>
 
-        <StatsBar nodes={nodes.filter((n) => !n.hidden)} latest={latest} />
+        <StatsBar
+          nodes={nodes.filter((n) => !n.hidden)}
+          latest={latest}
+        />
 
         <div className="flex items-center gap-2 mt-4 mb-4 flex-wrap">
           <input
@@ -225,6 +320,7 @@ export default function App() {
             placeholder={t("search")}
             className="glass search rounded-full px-4 py-2 text-[13.5px] w-full sm:w-[300px]"
           />
+
           {groups.length > 0 && (
             <div className="flex gap-1.5 flex-wrap">
               <button
@@ -232,12 +328,19 @@ export default function App() {
                 className="px-3 py-1.5 rounded-full text-[12.5px] cursor-pointer"
                 style={
                   group === ""
-                    ? { background: "var(--accent)", color: "#fff" }
-                    : { background: "var(--chip)", border: "1px solid var(--glass-border)" }
+                    ? {
+                        background: "var(--accent)",
+                        color: "#fff",
+                      }
+                    : {
+                        background: "var(--chip)",
+                        border: "1px solid var(--glass-border)",
+                      }
                 }
               >
                 {t("all")}
               </button>
+
               {groups.map((g) => (
                 <button
                   key={g}
@@ -245,8 +348,14 @@ export default function App() {
                   className="px-3 py-1.5 rounded-full text-[12.5px] cursor-pointer"
                   style={
                     group === g
-                      ? { background: "var(--accent)", color: "#fff" }
-                      : { background: "var(--chip)", border: "1px solid var(--glass-border)" }
+                      ? {
+                          background: "var(--accent)",
+                          color: "#fff",
+                        }
+                      : {
+                          background: "var(--chip)",
+                          border: "1px solid var(--glass-border)",
+                        }
                   }
                 >
                   {g}
@@ -254,14 +363,18 @@ export default function App() {
               ))}
             </div>
           )}
+
           <span className="text-[12px] text-dim ml-auto num">
             {shown.length} {t("nodes")}
           </span>
         </div>
 
         {shown.length === 0 && nodes.length > 0 && (
-          <div className="text-center text-dim py-20 text-[14px]">{t("empty")}</div>
+          <div className="text-center text-dim py-20 text-[14px]">
+            {t("empty")}
+          </div>
         )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {shown.map((n, i) => (
             <NodeCard
@@ -277,21 +390,6 @@ export default function App() {
             />
           ))}
         </div>
-
-        <div className="site-footer mt-10">
-          <VisitorInfo enabled={showVisitorIp} endpoint={visitorIpEndpoint} />
-          <footer className="text-center text-[12px] text-dim">
-            Powered by{" "}
-            <a href="https://github.com/komari-monitor/komari" className="underline opacity-80 hover:opacity-100">
-              Komari
-            </a>{" "}
-            · Theme{" "}
-            <a href="https://github.com/tryingmeow/komari-theme-tasogare" className="underline opacity-80 hover:opacity-100">
-              Tasogare 黄昏
-            </a>{" "}
-            · Latency mod by vlongx (｡•̀ᴗ-)✧
-          </footer>
-        </div>
       </div>
 
       <LatencyTaskSelector
@@ -302,6 +400,7 @@ export default function App() {
         onClose={() => setLatencySelectorOpen(false)}
         onSave={(next) => {
           const safe = sanitizeSelections(next, pingTasks);
+
           setLatencySelections(safe);
           writeStoredSelections(safe);
           setLatencySelectorOpen(false);
