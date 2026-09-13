@@ -136,6 +136,7 @@ export interface PingRecord {
 interface CFSMServer {
   id: string;
   name: string;
+  sort_order?: number;
   server_group?: string;
   tags?: string;
 
