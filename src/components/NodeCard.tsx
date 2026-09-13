@@ -113,9 +113,7 @@ function ConnectionsRow({ tcp, udp }: { tcp: number; udp: number }) {
 }
 
 function normalizedResetDay(tags: string, fallback: number): number {
-  const match = (tags || "").match(
-    /(?:^|[;,])\s*traffic-reset\s*:\s*(\d{1,2})\s*(?:[;,]|$)/i,
-  );
+  const match = (tags || "").match(/(?:^|[;,])\s*traffic-reset\s*:\s*(\d{1,2})\s*(?:[;,]|$)/i);
   const value = match ? Number(match[1]) : Number(fallback);
   if (!Number.isFinite(value)) return 1;
   return Math.max(1, Math.min(28, Math.round(value)));
@@ -125,7 +123,6 @@ function cycleStart(resetDay: number): Date {
   const now = new Date();
   let year = now.getFullYear();
   let month = now.getMonth();
-
   if (now.getDate() < resetDay) {
     month -= 1;
     if (month < 0) {
@@ -133,7 +130,6 @@ function cycleStart(resetDay: number): Date {
       year -= 1;
     }
   }
-
   return new Date(year, month, resetDay, 0, 0, 0, 0);
 }
 
@@ -149,7 +145,6 @@ function cumulativeDelta(
   if (sorted.length === 0) return 0;
 
   let baselineIndex = 0;
-
   for (let i = 0; i < sorted.length; i++) {
     if (new Date(sorted[i].time).getTime() <= startMs) {
       baselineIndex = i;
@@ -165,7 +160,6 @@ function cumulativeDelta(
     if (new Date(sorted[i].time).getTime() < startMs) continue;
 
     const current = Math.max(0, Number(sorted[i][key]) || 0);
-
     total += current >= previous ? current - previous : current;
     previous = current;
   }
@@ -180,15 +174,10 @@ function cycleTrafficFromRecords(
 ): number | null {
   const start = cycleStart(resetDay);
   const startMs = start.getTime();
-
-  const inCycle = records.filter(
-    (r) => new Date(r.time).getTime() >= startMs,
-  );
+  const inCycle = records.filter((r) => new Date(r.time).getTime() >= startMs);
 
   const hasDeltaTraffic = inCycle.some(
-    (r) =>
-      Number(r.traffic_up || 0) > 0 ||
-      Number(r.traffic_down || 0) > 0,
+    (r) => Number(r.traffic_up || 0) > 0 || Number(r.traffic_down || 0) > 0,
   );
 
   if (hasDeltaTraffic) {
@@ -226,7 +215,6 @@ function useCycleTraffic(
   defaultResetDay: number,
 ): number | null {
   const [value, setValue] = useState<number | null>(null);
-
   const resetDay = normalizedResetDay(node.tags, defaultResetDay);
 
   useEffect(() => {
@@ -241,7 +229,6 @@ function useCycleTraffic(
     const load = async () => {
       try {
         const start = cycleStart(resetDay);
-
         const hours = Math.min(
           24 * 35,
           Math.max(
@@ -298,20 +285,16 @@ function currencySymbol(currency: string): string {
 
 function billingText(node: NodeInfo): string | null {
   const price = Number(node.price);
-
   if (!Number.isFinite(price) || price === 0) return null;
 
   const cycleDays = Number(node.billing_cycle);
-
   const cycle =
     Number.isFinite(cycleDays) && cycleDays > 0
       ? fmtCycle(Math.round(cycleDays))
       : "";
 
   const amount =
-    price < 0
-      ? t("free")
-      : `${currencySymbol(node.currency)}${price}`;
+    price < 0 ? t("free") : `${currencySymbol(node.currency)}${price}`;
 
   return cycle ? `${amount}/${cycle}` : amount;
 }
@@ -319,6 +302,61 @@ function billingText(node: NodeInfo): string | null {
 function onlineDays(uptime: number | undefined): number {
   const seconds = Math.max(0, Number(uptime) || 0);
   return Math.floor(seconds / 86400);
+}
+
+/* =========================
+   TAG 自动颜色
+   ========================= */
+
+function tagColor(tag: string): string {
+  const value = tag.toLowerCase();
+
+  // 带宽
+  if (value.includes("10gbps")) return "#f43f5e";
+  if (value.includes("1gbps")) return "#3b82f6";
+  if (value.includes("500mbps")) return "#8b5cf6";
+  if (value.includes("100mbps")) return "#a855f7";
+  if (value.includes("50mbps")) return "#14b8a6";
+  if (value.includes("10mbps")) return "#22c55e";
+
+  // 中国 / 港澳台
+  if (
+    value.includes("中国") ||
+    value.includes("香港") ||
+    value.includes("台湾") ||
+    value.includes("澳门")
+  ) {
+    return "#f59e0b";
+  }
+
+  // 亚洲
+  if (
+    value.includes("日本") ||
+    value.includes("韩国") ||
+    value.includes("新加坡") ||
+    value.includes("马来西亚") ||
+    value.includes("泰国")
+  ) {
+    return "#22c55e";
+  }
+
+  // 北美
+  if (value.includes("美国") || value.includes("加拿大")) {
+    return "#3b82f6";
+  }
+
+  // 欧洲
+  if (
+    value.includes("德国") ||
+    value.includes("法国") ||
+    value.includes("英国") ||
+    value.includes("荷兰")
+  ) {
+    return "#8b5cf6";
+  }
+
+  // 默认
+  return "#94a3b8";
 }
 
 export default function NodeCard({
@@ -332,31 +370,16 @@ export default function NodeCard({
   onClick,
 }: Props) {
   const online = !!status?.online;
-
   const cpu = status ? Math.min(100, status.cpu) : 0;
-
   const ramPct = status
-    ? fmtPercent(
-        status.ram,
-        status.ram_total || node.mem_total,
-      )
+    ? fmtPercent(status.ram, status.ram_total || node.mem_total)
     : 0;
-
   const diskPct = status
-    ? fmtPercent(
-        status.disk,
-        status.disk_total || node.disk_total,
-      )
+    ? fmtPercent(status.disk, status.disk_total || node.disk_total)
     : 0;
 
   const trafficLimit = node.traffic_limit || 0;
-
-  const cycleTraffic = useCycleTraffic(
-    node,
-    index,
-    trafficResetDay,
-  );
-
+  const cycleTraffic = useCycleTraffic(node, index, trafficResetDay);
   const rawTraffic = status
     ? trafficUsed(
         status.net_total_up,
@@ -366,26 +389,29 @@ export default function NodeCard({
     : 0;
 
   const trafficUse = cycleTraffic ?? rawTraffic;
-
   const trafficPct =
     trafficLimit > 0
       ? Math.min(100, (trafficUse / trafficLimit) * 100)
       : 0;
 
   const trafficStyle =
-    trafficPct >= 90
-      ? GRADS.trafficHot
-      : GRADS.traffic;
+    trafficPct >= 90 ? GRADS.trafficHot : GRADS.traffic;
 
   const expDays = daysUntil(node.expired_at);
   const expSoon = expDays !== null && expDays <= 15;
-
   const billing = billingText(node);
 
-  // TAG 支持：
-  // 1. 逗号分隔：1Gbps,马来西亚
-  // 2. 分号分隔：1Gbps;马来西亚
-  // 3. 彩色 TAG：1Gbps#3b82f6,马来西亚#22c55e
+  /*
+   * TAG：
+   *
+   * 后台：
+   * 1Gbps,马来西亚
+   *
+   * 前端：
+   * 🔵 1Gbps   🟢 马来西亚
+   *
+   * 同时支持逗号和分号。
+   */
   const tags = (node.tags || "")
     .split(/[;,]/)
     .map((s) => s.trim())
@@ -395,16 +421,10 @@ export default function NodeCard({
         !/^traffic-reset\s*:/i.test(s),
     )
     .slice(0, 3)
-    .map((tag) => {
-      const match = tag.match(
-        /^(.+?)#([0-9a-fA-F]{6})$/,
-      );
-
-      return {
-        label: match ? match[1].trim() : tag,
-        color: match ? `#${match[2]}` : null,
-      };
-    });
+    .map((tag) => ({
+      label: tag,
+      color: tagColor(tag),
+    }));
 
   return (
     <article
@@ -455,17 +475,13 @@ export default function NodeCard({
           <div className="flex items-center gap-1.5 whitespace-nowrap">
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
-                online
-                  ? "dot-online"
-                  : "dot-offline"
+                online ? "dot-online" : "dot-offline"
               }`}
             />
 
             <span>
               {online && status
-                ? `${t("online")} ${onlineDays(
-                    status.uptime,
-                  )}${t("day")}`
+                ? `${t("online")} ${onlineDays(status.uptime)}${t("day")}`
                 : t("offline")}
             </span>
           </div>
@@ -497,8 +513,7 @@ export default function NodeCard({
           sub={
             online && status
               ? `${fmtBytes(status.ram)} / ${fmtBytes(
-                  status.ram_total ||
-                    node.mem_total,
+                  status.ram_total || node.mem_total,
                 )}`
               : undefined
           }
@@ -512,8 +527,7 @@ export default function NodeCard({
           sub={
             online && status
               ? `${fmtBytes(status.disk)} / ${fmtBytes(
-                  status.disk_total ||
-                    node.disk_total,
+                  status.disk_total || node.disk_total,
                 )}`
               : undefined
           }
@@ -527,9 +541,7 @@ export default function NodeCard({
             color={trafficStyle.color}
             sub={
               online && status
-                ? `${fmtBytes(
-                    trafficUse,
-                  )} / ${fmtBytes(
+                ? `${fmtBytes(trafficUse)} / ${fmtBytes(
                     trafficLimit,
                   )}`
                 : undefined
@@ -560,16 +572,12 @@ export default function NodeCard({
         {online && status ? (
           <>
             <span className="whitespace-nowrap">
-              <span style={{ color: "#fb7185" }}>
-                ↑
-              </span>{" "}
+              <span style={{ color: "#fb7185" }}>↑</span>{" "}
               {fmtSpeed(status.net_out)}
             </span>
 
             <span className="whitespace-nowrap">
-              <span style={{ color: "#2dd4bf" }}>
-                ↓
-              </span>{" "}
+              <span style={{ color: "#2dd4bf" }}>↓</span>{" "}
               {fmtSpeed(status.net_in)}
             </span>
           </>
@@ -581,7 +589,7 @@ export default function NodeCard({
       </div>
 
       {(tags.length > 0 || expSoon) && (
-        <div className="node-card-tags flex gap-1.5 mt-2.5 flex-wrap">
+        <div className="node-card-tags flex items-center gap-1.5 mt-2.5 flex-wrap">
           {expSoon && (
             <span
               className="text-[10.5px] px-2 py-0.5 rounded-full font-medium"
@@ -610,18 +618,15 @@ export default function NodeCard({
               className="text-[10.5px] px-2 py-0.5 rounded-full"
               style={{
                 background: "var(--chip)",
-                border:
-                  "1px solid var(--glass-border)",
+                border: "1px solid var(--glass-border)",
               }}
             >
-              {tag.color && (
-                <span
-                  className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
-                  style={{
-                    background: tag.color,
-                  }}
-                />
-              )}
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
+                style={{
+                  background: tag.color,
+                }}
+              />
 
               {tag.label}
             </span>
