@@ -262,7 +262,7 @@ export default function NodeCard({
   const billing = billingText(node);
 
   const tags = (node.tags || "")
-    .split(";")
+    .split(",")
     .map((s) => s.trim())
     .filter((s) => Boolean(s) && !/^traffic-reset\s*:/i.test(s))
     .slice(0, 3);
