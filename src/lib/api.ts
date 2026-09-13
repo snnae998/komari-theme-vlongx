@@ -576,7 +576,7 @@ function gpuName(
 }
 
 function gpuUsage(
-  server: CFSMServer,
+  server: Pick<CFSMServer, "gpu_info">,
 ): number {
   const values = parseGpuInfo(server)
     .map((item) =>
