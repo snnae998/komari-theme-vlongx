@@ -9,34 +9,43 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
+
     steps:
+      # 1. 拉取源码
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. 安装 Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
+      # 3. 安装依赖
       - name: Install dependencies
         run: npm ci
 
+      # 4. 编译并打包主题
       - name: Build and package
         run: npm run package
 
+      # 5. 获取版本号
       - name: Resolve release metadata
         id: meta
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
           ZIP="komari-theme-tasogare-gpu-${VERSION}-komari.zip"
+
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
+      # 6. 保存 ZIP 构建产物
       - name: Upload theme zip
         uses: actions/upload-artifact@v4
         with:
@@ -44,6 +53,7 @@ jobs:
           path: ${{ steps.meta.outputs.zip }}
           if-no-files-found: error
 
+      # 7. 发布 GitHub Release
       - name: Publish GitHub release
         if: github.ref == 'refs/heads/main'
         env:
@@ -59,17 +69,27 @@ jobs:
           基于 Tasogare v1.2.2 整合并增强，版本继续保持 v${VERSION}。
 
           ### 本次更新
-          - 节点卡片右上角显示“在线 + 完整天数”，例如“在线 10天”，不再显示小时和时钟图标。
-          - 服务器费用移动到在线状态下方，直接读取 Komari 节点的价格、币种与计费周期。
-          - 不同节点按后台账单分别显示，例如 €17.99/月、€281.7/半年、\$25/年、免费/月，不使用固定金额。
-          - 支持常用货币代码转换为符号，并新增半年计费周期显示。
-          - 卡片底部只保留实时上传和下载速度；未配置价格的节点自动隐藏费用。
-          - 保留 TCPing 底部安全间距、窄屏和高 DPI 修复，以及 GPU/iGPU、流量周期、访问 IP 等现有功能。
+
+          - 节点卡片右上角显示“在线 + 完整天数”
+          - 例如“在线 10天”，不再显示小时和时钟图标
+          - 服务器费用移动到在线状态下方
+          - 直接读取 Komari 节点的价格、币种与计费周期
+          - 不同节点按后台账单分别显示
+          - 支持 €17.99/月、€281.7/半年、$25/年、免费/月等显示
+          - 支持常用货币代码转换为货币符号
+          - 新增半年计费周期显示
+          - 卡片底部只保留实时上传和下载速度
+          - 未配置价格的节点自动隐藏费用
+          - 保留 TCPing 底部安全间距
+          - 保留窄屏和高 DPI 修复
+          - 保留 GPU/iGPU、流量周期、访问 IP 等现有功能
 
           ### 安装
+
           下载 \`${ZIP}\`，在 Komari 后台主题管理中直接上传 ZIP，不要解压。
           EOF
 
+          # 如果标签已经存在，强制指向当前提交
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
             gh api --method PATCH \
               "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" \
@@ -77,15 +97,49 @@ jobs:
               -F force=true >/dev/null
           fi
 
+          # 如果 Release 已存在，则更新
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" \
               --target "$GITHUB_SHA" \
               --title "v${VERSION} — Header Billing Layout" \
               --notes-file release-notes.md
+
             gh release upload "$TAG" "$ZIP" --clobber
           else
+            # 否则创建新的 Release
             gh release create "$TAG" "$ZIP" \
               --target "$GITHUB_SHA" \
               --title "v${VERSION} — Header Billing Layout" \
               --notes-file release-notes.md
           fi
+
+      # 8. 暂存编译后的 dist
+      - name: Save dist
+        shell: bash
+        run: |
+          rm -rf /tmp/komari-dist
+          cp -R dist /tmp/komari-dist
+
+      # 9. 发布 dist 分支
+      # Komari 的“自定义主题 URL”需要指向构建产物
+      - name: Publish dist branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 创建独立的 dist 分支
+          git checkout --orphan dist
+
+          # 删除原 main 分支文件
+          git rm -rf . || true
+
+          # 放入编译后的 dist 文件
+          cp -R /tmp/komari-dist/. .
+
+          # 提交
+          git add -A
+          git commit -m "Deploy built theme"
+
+          # 强制更新 dist 分支
+          git push origin dist --force
