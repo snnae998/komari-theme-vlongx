@@ -28,24 +28,36 @@ export interface LatestStatus {
   time: string;
   cpu: number;
   gpu: number;
+
+  // 注意：
+  // Komari 主题这里需要的是「已使用字节数」，
+  // 不是百分比。
   ram: number;
   ram_total: number;
+
   swap: number;
   swap_total: number;
+
   load: number;
   load5: number;
   load15: number;
+
   disk: number;
   disk_total: number;
+
   net_in: number;
   net_out: number;
+
   net_total_up: number;
   net_total_down: number;
+
   process: number;
   connections: number;
   connections_udp: number;
+
   online: boolean;
   uptime: number;
+
   ping: Record<string, PingStat>;
 }
 
@@ -69,19 +81,27 @@ export interface LoadRecord {
   time: string;
   cpu: number;
   gpu?: number;
+
   ram: number;
   ram_total: number;
+
   swap: number;
   swap_total: number;
+
   load: number;
+
   disk: number;
   disk_total: number;
+
   net_in: number;
   net_out: number;
+
   net_total_up?: number;
   net_total_down?: number;
+
   traffic_up?: number;
   traffic_down?: number;
+
   connections: number;
   connections_udp: number;
   process: number;
@@ -136,6 +156,7 @@ export interface PingRecord {
 interface CFSMServer {
   id: string;
   name: string;
+
   sort_order?: number;
   server_group?: string;
   tags?: string;
@@ -143,26 +164,28 @@ interface CFSMServer {
   price?: string | number;
   billing_cycle?: string;
   currency?: string;
-  expire_date?: string;
+  expire_date?: string | null;
 
-  traffic_limit?: string;
+  traffic_limit?: string | number;
   traffic_calc_type?: string;
 
-  is_hidden?: string;
+  is_hidden?: string | number | boolean;
 
-  cpu?: number;
+  cpu?: number | string;
   load_avg?: string;
 
-  net_in_speed?: number;
-  net_out_speed?: number;
-  net_rx?: number;
-  net_tx?: number;
-  net_rx_monthly?: number;
-  net_tx_monthly?: number;
+  net_in_speed?: number | string;
+  net_out_speed?: number | string;
 
-  processes?: number;
-  tcp_conn?: number;
-  udp_conn?: number;
+  net_rx?: number | string;
+  net_tx?: number | string;
+
+  net_rx_monthly?: number | string;
+  net_tx_monthly?: number | string;
+
+  processes?: number | string;
+  tcp_conn?: number | string;
+  udp_conn?: number | string;
 
   ping_ct?: number | null | false;
   ping_cu?: number | null | false;
@@ -175,50 +198,65 @@ interface CFSMServer {
   loss_bd?: number | null | false;
 
   ping?: Array<{
-    ts: number;
+    ts: number | string;
+
     ct?: number | null | false;
     cu?: number | null | false;
     cm?: number | null | false;
     bd?: number | null | false;
   }>;
 
-  ram_total?: number;
-  ram_used?: number;
+  loss?: Array<{
+    ts: number | string;
 
-  swap_total?: number;
-  swap_used?: number;
+    ct?: number | null | false;
+    cu?: number | null | false;
+    cm?: number | null | false;
+    bd?: number | null | false;
+  }>;
 
-  disk_total?: number;
-  disk_used?: number;
+  ram_total?: number | string;
+  ram_used?: number | string;
+
+  swap_total?: number | string;
+  swap_used?: number | string;
+
+  disk_total?: number | string;
+  disk_used?: number | string;
 
   disk?: {
-    read_bps?: number;
-    write_bps?: number;
-    read_iops?: number;
-    write_iops?: number;
-    await_ms?: number;
-    util?: number;
+    read_bps?: number | string;
+    write_bps?: number | string;
+    read_iops?: number | string;
+    write_iops?: number | string;
+    await_ms?: number | string;
+    util?: number | string;
   };
 
-  cpu_cores?: number;
+  cpu_cores?: number | string;
   cpu_info?: string;
 
-  gpu_info?: string | Array<{
-    id?: string;
-    name?: string;
-    info?: number;
-  }> | null;
+  gpu_info?:
+    | string
+    | Array<{
+        id?: string;
+        name?: string;
+        info?: number | string;
+      }>
+    | null;
 
   arch?: string;
   os?: string;
   kernel_version?: string;
 
   region?: string;
+
   ip_v4?: string;
   ip_v6?: string;
 
   boot_time?: string | number;
-  last_updated?: number;
+  last_updated?: string | number;
+  timestamp?: string | number;
 
   is_online?: boolean;
 }
@@ -231,14 +269,18 @@ interface ServersResponse {
   sysConfig?: unknown;
 }
 
-async function getJSON<T>(url: string): Promise<T> {
-  const r = await fetch(url);
+/* =========================================================
+ * HTTP
+ * ========================================================= */
 
-  if (!r.ok) {
-    throw new Error(`${url}: ${r.status}`);
+async function getJSON<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`${url}: ${response.status}`);
   }
 
-  return (await r.json()) as T;
+  return (await response.json()) as T;
 }
 
 /* =========================================================
@@ -246,15 +288,92 @@ async function getJSON<T>(url: string): Promise<T> {
  * ========================================================= */
 
 function number(value: unknown, fallback = 0): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : fallback;
+  }
+
+  return fallback;
 }
 
+/**
+ * CF-Server-Monitor：
+ * ram_total / ram_used / disk_total / disk_used
+ * 单位都是 MiB。
+ */
 function mbToBytes(value: unknown): number {
   return number(value) * 1024 * 1024;
 }
 
-function parseLoad(value: unknown): [number, number, number] {
+/**
+ * 时间戳统一转换成毫秒。
+ *
+ * 支持：
+ * - Unix 秒
+ * - Unix 毫秒
+ * - 数字字符串
+ * - ISO 8601 字符串
+ */
+function timestampToMs(value: unknown): number {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) {
+      return 0;
+    }
+
+    return value < 10_000_000_000
+      ? value * 1000
+      : value;
+  }
+
+  if (typeof value !== "string") {
+    return 0;
+  }
+
+  const text = value.trim();
+
+  if (!text) {
+    return 0;
+  }
+
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const parsed = Number(text);
+
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 0;
+    }
+
+    return parsed < 10_000_000_000
+      ? parsed * 1000
+      : parsed;
+  }
+
+  const parsed = Date.parse(text);
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
+}
+
+function timestampToISOString(value: unknown): string {
+  const ms = timestampToMs(value);
+
+  if (!ms) {
+    return new Date().toISOString();
+  }
+
+  return new Date(ms).toISOString();
+}
+
+function parseLoad(
+  value: unknown,
+): [number, number, number] {
   if (typeof value !== "string") {
     return [0, 0, 0];
   }
@@ -272,22 +391,40 @@ function parseLoad(value: unknown): [number, number, number] {
   ];
 }
 
+/* =========================================================
+ * 价格
+ * ========================================================= */
+
 function parsePrice(value: unknown): number {
-  if (value === undefined || value === null || value === "") {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
     return 0;
   }
 
-  const n = Number(value);
+  const n = Number(
+    String(value).replace(/,/g, ""),
+  );
 
-  if (!Number.isFinite(n)) {
-    return 0;
-  }
-
-  return n;
+  return Number.isFinite(n)
+    ? n
+    : 0;
 }
 
-function billingCycleToDays(value: unknown): number {
-  switch (String(value ?? "").toLowerCase()) {
+/* =========================================================
+ * 计费周期
+ * ========================================================= */
+
+function billingCycleToDays(
+  value: unknown,
+): number {
+  switch (
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+  ) {
     case "month":
       return 30;
 
@@ -317,13 +454,31 @@ function billingCycleToDays(value: unknown): number {
   }
 }
 
-function parseTrafficLimit(value: unknown): number {
-  if (value === undefined || value === null) {
+/* =========================================================
+ * 流量配额
+ *
+ * CFSM 后台 traffic_limit 默认单位是 GB。
+ *
+ * 例如：
+ * "500.0" → 500 GB
+ * "500GB" → 500 GB
+ * "1TB"   → 1 TB
+ * ========================================================= */
+
+function parseTrafficLimit(
+  value: unknown,
+): number {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
     return 0;
   }
 
   if (typeof value === "number") {
-    return value;
+    // CFSM 数字流量配额默认也是 GB
+    return value * 1024 ** 3;
   }
 
   const text = String(value).trim();
@@ -333,81 +488,104 @@ function parseTrafficLimit(value: unknown): number {
   }
 
   const match = text.match(
-    /^([\d.]+)\s*(KB|MB|GB|TB|PB)?$/i,
+    /^(-?[\d.]+)\s*(KB|MB|GB|TB|PB|K|M|G|T|P)?$/i,
   );
 
   if (!match) {
-    return number(text, 0);
+    return 0;
   }
 
-  const valueNumber = Number(match[1]);
-  const unit = (match[2] || "B").toUpperCase();
+  const amount = Number(match[1]);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+
+  const unit = (
+    match[2] || "GB"
+  ).toUpperCase();
 
   const units: Record<string, number> = {
-    B: 1,
+    K: 1024,
     KB: 1024,
+
+    M: 1024 ** 2,
     MB: 1024 ** 2,
+
+    G: 1024 ** 3,
     GB: 1024 ** 3,
+
+    T: 1024 ** 4,
     TB: 1024 ** 4,
+
+    P: 1024 ** 5,
     PB: 1024 ** 5,
   };
 
-  return valueNumber * (units[unit] || 1);
+  return amount * (
+    units[unit] ?? 1024 ** 3
+  );
 }
 
-function gpuName(server: CFSMServer): string {
+/* =========================================================
+ * GPU
+ * ========================================================= */
+
+function parseGpuInfo(
+  server: CFSMServer,
+): Array<{
+  name?: string;
+  info?: number | string;
+}> {
   const gpu = server.gpu_info;
 
   if (!gpu) {
-    return "";
+    return [];
   }
 
   if (typeof gpu === "string") {
+    const text = gpu.trim();
+
+    if (!text) {
+      return [];
+    }
+
     try {
-      return gpuName({
-        ...server,
-        gpu_info: JSON.parse(gpu),
-      });
+      const parsed = JSON.parse(text);
+
+      return Array.isArray(parsed)
+        ? parsed
+        : [];
     } catch {
-      return "";
+      return [];
     }
   }
 
-  if (!Array.isArray(gpu)) {
-    return "";
-  }
+  return Array.isArray(gpu)
+    ? gpu
+    : [];
+}
 
-  return gpu
+function gpuName(
+  server: CFSMServer,
+): string {
+  return parseGpuInfo(server)
     .map((item) => item?.name || "")
     .filter(Boolean)
     .join(", ");
 }
 
-function gpuUsage(server: CFSMServer): number {
-  const gpu = server.gpu_info;
-
-  if (!gpu) {
-    return 0;
-  }
-
-  if (typeof gpu === "string") {
-    try {
-      return gpuUsage({
-        ...server,
-        gpu_info: JSON.parse(gpu),
-      });
-    } catch {
-      return 0;
-    }
-  }
-
-  if (!Array.isArray(gpu) || gpu.length === 0) {
-    return 0;
-  }
-
-  const values = gpu
-    .map((item) => number(item?.info))
-    .filter(Number.isFinite);
+function gpuUsage(
+  server: CFSMServer,
+): number {
+  const values = parseGpuInfo(server)
+    .map((item) =>
+      number(item?.info, 0),
+    )
+    .filter(
+      (value) =>
+        Number.isFinite(value),
+    );
 
   if (values.length === 0) {
     return 0;
@@ -416,211 +594,459 @@ function gpuUsage(server: CFSMServer): number {
   return Math.max(...values);
 }
 
-function online(server: CFSMServer): boolean {
-  if (typeof server.is_online === "boolean") {
+/* =========================================================
+ * 在线状态
+ * ========================================================= */
+
+function online(
+  server: CFSMServer,
+): boolean {
+  if (
+    typeof server.is_online ===
+    "boolean"
+  ) {
     return server.is_online;
   }
 
-  if (!server.last_updated) {
+  const updated = timestampToMs(
+    server.last_updated ??
+      server.timestamp,
+  );
+
+  if (!updated) {
     return false;
   }
 
-  return Date.now() - Number(server.last_updated) <= 5 * 60 * 1000;
-}
-
-function uptimeSeconds(server: CFSMServer): number {
-  if (server.boot_time === undefined || server.boot_time === null) {
-    return 0;
-  }
-
-  const boot = number(server.boot_time);
-
-  if (!boot) {
-    return 0;
-  }
-
-  const bootMs = boot < 10_000_000_000
-    ? boot * 1000
-    : boot;
-
-  return Math.max(
-    0,
-    Math.floor((Date.now() - bootMs) / 1000),
+  return (
+    Date.now() - updated <=
+    5 * 60 * 1000
   );
 }
 
 /* =========================================================
- * CF-Server-Monitor → Komari 数据结构适配
+ * 运行时间
  * ========================================================= */
 
-function toNodeInfo(server: CFSMServer): NodeInfo {
+function uptimeSeconds(
+  server: CFSMServer,
+): number {
+  const bootMs = timestampToMs(
+    server.boot_time,
+  );
+
+  if (!bootMs) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.floor(
+      (Date.now() - bootMs) / 1000,
+    ),
+  );
+}
+
+/* =========================================================
+ * 隐藏节点
+ * ========================================================= */
+
+function isHidden(
+  server: CFSMServer,
+): boolean {
+  return (
+    String(server.is_hidden) ===
+    "1"
+  );
+}
+
+/* =========================================================
+ * Ping
+ * ========================================================= */
+
+interface PingPoint {
+  ts: number | string;
+  ct?: number | null | false;
+  cu?: number | null | false;
+  cm?: number | null | false;
+  bd?: number | null | false;
+}
+
+function validPing(
+  value: unknown,
+): value is number | string {
+  return (
+    value !== null &&
+    value !== undefined &&
+    value !== false &&
+    Number.isFinite(
+      number(value, NaN),
+    )
+  );
+}
+
+function pingStatistics(
+  values: number[],
+): {
+  latest: number;
+  avg: number;
+  tail: number;
+  min: number;
+  max: number;
+} | null {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const latest =
+    values[values.length - 1] ?? 0;
+
+  const min =
+    Math.min(...values);
+
+  const max =
+    Math.max(...values);
+
+  const avg =
+    values.reduce(
+      (sum, value) =>
+        sum + value,
+      0,
+    ) / values.length;
+
+  // tail 使用最后一个有效值
+  const tail = latest;
+
+  return {
+    latest,
+    avg,
+    tail,
+    min,
+    max,
+  };
+}
+
+function buildPingStats(
+  server: CFSMServer,
+): Record<string, PingStat> {
+  const result: Record<
+    string,
+    PingStat
+  > = {};
+
+  const definitions = [
+    {
+      key: "ct",
+      name: "电信",
+      current: server.ping_ct,
+      loss: server.loss_ct,
+    },
+    {
+      key: "cu",
+      name: "联通",
+      current: server.ping_cu,
+      loss: server.loss_cu,
+    },
+    {
+      key: "cm",
+      name: "移动",
+      current: server.ping_cm,
+      loss: server.loss_cm,
+    },
+    {
+      key: "bd",
+      name: "BGP",
+      current: server.ping_bd,
+      loss: server.loss_bd,
+    },
+  ];
+
+  for (const item of definitions) {
+    const values: number[] = [];
+
+    for (
+      const point of
+      server.ping ?? []
+    ) {
+      const value =
+        point[item.key as keyof PingPoint];
+
+      if (validPing(value)) {
+        values.push(
+          number(value),
+        );
+      }
+    }
+
+    // 如果没有窗口数据，
+    // 使用 /api/servers 当前值。
+    if (
+      values.length === 0 &&
+      validPing(item.current)
+    ) {
+      values.push(
+        number(item.current),
+      );
+    }
+
+    const stats =
+      pingStatistics(values);
+
+    if (!stats) {
+      continue;
+    }
+
+    result[item.key] = {
+      name: item.name,
+
+      latest: stats.latest,
+
+      avg: stats.avg,
+
+      tail: stats.tail,
+
+      loss: number(
+        item.loss,
+        0,
+      ),
+
+      min: stats.min,
+
+      max: stats.max,
+    };
+  }
+
+  return result;
+}
+
+/* =========================================================
+ * CFSM → Komari NodeInfo
+ * ========================================================= */
+
+function toNodeInfo(
+  server: CFSMServer,
+): NodeInfo {
   return {
     uuid: server.id,
+
     name: server.name,
 
-    cpu_name: server.cpu_info || "",
+    cpu_name:
+      server.cpu_info || "",
+
     virtualization: "",
 
-    arch: server.arch || "",
-    cpu_cores: number(server.cpu_cores),
+    arch:
+      server.arch || "",
 
-    os: server.os || "",
-    gpu_name: gpuName(server),
+    cpu_cores:
+      number(server.cpu_cores),
 
-    region: server.region || "",
+    os:
+      server.os || "",
 
-    // CF-Server-Monitor 的容量单位是 MB
-    mem_total: mbToBytes(server.ram_total),
-    swap_total: mbToBytes(server.swap_total),
-    disk_total: mbToBytes(server.disk_total),
+    gpu_name:
+      gpuName(server),
 
-    weight: number(server.sort_order),
+    region:
+      server.region || "",
 
-    price: parsePrice(server.price),
+    /*
+     * CFSM 容量单位：
+     * MB → Bytes
+     */
+    mem_total:
+      mbToBytes(
+        server.ram_total,
+      ),
 
-    billing_cycle: billingCycleToDays(
-      server.billing_cycle,
-    ),
+    swap_total:
+      mbToBytes(
+        server.swap_total,
+      ),
 
-    currency: server.currency || "",
+    disk_total:
+      mbToBytes(
+        server.disk_total,
+      ),
+
+    weight:
+      number(
+        server.sort_order,
+      ),
+
+    price:
+      parsePrice(
+        server.price,
+      ),
+
+    billing_cycle:
+      billingCycleToDays(
+        server.billing_cycle,
+      ),
+
+    currency:
+      server.currency || "",
 
     expired_at:
       server.expire_date
         ? `${server.expire_date} 00:00:00`
         : null,
 
-    group: server.server_group || "Default",
+    group:
+      server.server_group ||
+      "Default",
 
-    tags: server.tags || "",
+    tags:
+      server.tags || "",
 
-    hidden: server.is_hidden === "1",
+    hidden:
+      isHidden(server),
 
+    /*
+     * traffic_limit 最终必须是 Bytes
+     */
     traffic_limit:
-      parseTrafficLimit(server.traffic_limit),
+      parseTrafficLimit(
+        server.traffic_limit,
+      ),
 
     traffic_limit_type:
-      server.traffic_calc_type || "total",
+      server.traffic_calc_type ||
+      "total",
   };
 }
+
+/* =========================================================
+ * CFSM → Komari LatestStatus
+ * ========================================================= */
 
 function toLatestStatus(
   server: CFSMServer,
 ): LatestStatus {
-  const load = parseLoad(server.load_avg);
+  const load =
+    parseLoad(
+      server.load_avg,
+    );
 
-  const ramTotal = mbToBytes(server.ram_total);
-  const ramUsed = mbToBytes(server.ram_used);
+  /*
+   * CFSM 的内存/硬盘字段单位是 MB。
+   *
+   * 这里一定要返回「已使用 Bytes」，
+   * 不能返回百分比。
+   */
+  const ramTotal =
+    mbToBytes(
+      server.ram_total,
+    );
 
-  const swapTotal = mbToBytes(server.swap_total);
-  const swapUsed = mbToBytes(server.swap_used);
+  const ramUsed =
+    mbToBytes(
+      server.ram_used,
+    );
 
-  const diskTotal = mbToBytes(server.disk_total);
-  const diskUsed = mbToBytes(server.disk_used);
+  const swapTotal =
+    mbToBytes(
+      server.swap_total,
+    );
 
-  const ramPercent =
-    ramTotal > 0
-      ? (ramUsed / ramTotal) * 100
-      : 0;
+  const swapUsed =
+    mbToBytes(
+      server.swap_used,
+    );
 
-  const swapPercent =
-    swapTotal > 0
-      ? (swapUsed / swapTotal) * 100
-      : 0;
+  const diskTotal =
+    mbToBytes(
+      server.disk_total,
+    );
 
-  const diskPercent =
-    diskTotal > 0
-      ? (diskUsed / diskTotal) * 100
-      : 0;
-
-  const ping: Record<string, PingStat> = {};
-
-  const pingItems = [
-    {
-      key: "ct",
-      name: "电信",
-      value: server.ping_ct,
-      loss: server.loss_ct,
-    },
-    {
-      key: "cu",
-      name: "联通",
-      value: server.ping_cu,
-      loss: server.loss_cu,
-    },
-    {
-      key: "cm",
-      name: "移动",
-      value: server.ping_cm,
-      loss: server.loss_cm,
-    },
-    {
-      key: "bd",
-      name: "BGP",
-      value: server.ping_bd,
-      loss: server.loss_bd,
-    },
-  ];
-
-  for (const item of pingItems) {
-    if (
-      item.value !== null &&
-      item.value !== undefined &&
-      item.value !== false
-    ) {
-      const value = number(item.value);
-
-      ping[item.key] = {
-        name: item.name,
-        latest: value,
-        avg: value,
-        tail: value,
-        loss: number(item.loss),
-        min: value,
-        max: value,
-      };
-    }
-  }
+  const diskUsed =
+    mbToBytes(
+      server.disk_used,
+    );
 
   return {
-    client: server.id,
+    client:
+      server.id,
 
-    time: server.last_updated
-      ? new Date(server.last_updated).toISOString()
-      : new Date().toISOString(),
+    time:
+      timestampToISOString(
+        server.last_updated ??
+          server.timestamp,
+      ),
 
-    cpu: number(server.cpu),
+    cpu:
+      number(server.cpu),
 
-    gpu: gpuUsage(server),
+    gpu:
+      gpuUsage(server),
 
-    ram: ramPercent,
-    ram_total: ramTotal,
+    /*
+     * ★ 这里是本次最重要的修复
+     */
+    ram:
+      ramUsed,
 
-    swap: swapPercent,
-    swap_total: swapTotal,
+    ram_total:
+      ramTotal,
 
-    load: load[0],
-    load5: load[1],
-    load15: load[2],
+    swap:
+      swapUsed,
 
-    disk: diskPercent,
-    disk_total: diskTotal,
+    swap_total:
+      swapTotal,
 
-    net_in: number(server.net_in_speed),
-    net_out: number(server.net_out_speed),
+    load:
+      load[0],
 
-    net_total_up: number(server.net_tx),
-    net_total_down: number(server.net_rx),
+    load5:
+      load[1],
 
-    process: number(server.processes),
+    load15:
+      load[2],
 
-    connections: number(server.tcp_conn),
-    connections_udp: number(server.udp_conn),
+    disk:
+      diskUsed,
 
-    online: online(server),
+    disk_total:
+      diskTotal,
 
-    uptime: uptimeSeconds(server),
+    net_in:
+      number(
+        server.net_in_speed,
+      ),
 
-    ping,
+    net_out:
+      number(
+        server.net_out_speed,
+      ),
+
+    /*
+     * net_tx = 上传累计
+     * net_rx = 下载累计
+     */
+    net_total_up:
+      number(server.net_tx),
+
+    net_total_down:
+      number(server.net_rx),
+
+    process:
+      number(server.processes),
+
+    connections:
+      number(server.tcp_conn),
+
+    connections_udp:
+      number(server.udp_conn),
+
+    online:
+      online(server),
+
+    uptime:
+      uptimeSeconds(server),
+
+    ping:
+      buildPingStats(server),
   };
 }
 
@@ -628,57 +1054,76 @@ function toLatestStatus(
  * 站点配置
  * ========================================================= */
 
-export const getPublicInfo = async (): Promise<PublicInfo> => {
-  const config = await getJSON<any>("/api/config");
+export const getPublicInfo =
+  async (): Promise<PublicInfo> => {
+    const config =
+      await getJSON<any>(
+        "/api/config",
+      );
 
-  return {
-    sitename:
-      config.site_title ||
-      "CF-Server-Monitor",
+    return {
+      sitename:
+        config.site_title ||
+        "CF-Server-Monitor",
 
-    description:
-      config.description ||
-      "",
+      description:
+        config.description ||
+        "",
 
-    theme_settings:
-      config.theme_options ||
-      {},
+      theme_settings:
+        config.theme_options ||
+        {},
+    };
   };
-};
 
 /* =========================================================
  * 服务器列表
  * ========================================================= */
 
-export const getNodes = async (): Promise<NodeInfo[]> => {
-  const response =
-    await getJSON<ServersResponse>(
-      "/api/servers",
-    );
-
-  return (response.servers || [])
-    .filter((server) => !server.is_hidden || server.is_hidden !== "1")
-    .map(toNodeInfo);
-};
-
-/* =========================================================
- * 最新状态
- *
- * CF-Server-Monitor 的 /api/servers 已经带有
- * 最新指标，所以这里直接转换。
- * ========================================================= */
-
-export const getLatest =
-  async (): Promise<Record<string, LatestStatus>> => {
+export const getNodes =
+  async (): Promise<NodeInfo[]> => {
     const response =
       await getJSON<ServersResponse>(
         "/api/servers",
       );
 
-    const result: Record<string, LatestStatus> = {};
+    return (
+      response.servers || []
+    )
+      .filter(
+        (server) =>
+          !isHidden(server),
+      )
+      .map(toNodeInfo)
+      .sort(
+        (a, b) =>
+          a.weight - b.weight,
+      );
+  };
 
-    for (const server of response.servers || []) {
-      if (server.is_hidden === "1") {
+/* =========================================================
+ * 最新状态
+ * ========================================================= */
+
+export const getLatest =
+  async (): Promise<
+    Record<string, LatestStatus>
+  > => {
+    const response =
+      await getJSON<ServersResponse>(
+        "/api/servers",
+      );
+
+    const result: Record<
+      string,
+      LatestStatus
+    > = {};
+
+    for (
+      const server of
+      response.servers || []
+    ) {
+      if (isHidden(server)) {
         continue;
       }
 
@@ -691,146 +1136,175 @@ export const getLatest =
 
 /* =========================================================
  * 历史负载
- *
- * CFSM:
- * GET /api/history/all?id=xxx&hours=24
  * ========================================================= */
 
-export const getRecords = async (
-  uuid: string,
-  hours: number,
-): Promise<LoadRecordsResponse> => {
-  const allowedHours = [
-    0.167,
-    0.5,
-    1,
-    6,
-    12,
-    24,
-    48,
-    96,
-    168,
-  ];
+export const getRecords =
+  async (
+    uuid: string,
+    hours: number,
+  ): Promise<LoadRecordsResponse> => {
+    const allowedHours = [
+      0.167,
+      0.5,
+      1,
+      6,
+      12,
+      24,
+      48,
+      96,
+      168,
+    ];
 
-  let selectedHours = hours;
+    let selectedHours =
+      allowedHours[0];
 
-  if (!allowedHours.includes(selectedHours)) {
-    selectedHours =
-      allowedHours.reduce(
-        (prev, current) =>
-          Math.abs(current - hours) <
-          Math.abs(prev - hours)
-            ? current
-            : prev,
-        allowedHours[0],
+    let bestDelta =
+      Number.POSITIVE_INFINITY;
+
+    for (
+      const option of
+      allowedHours
+    ) {
+      const delta =
+        Math.abs(
+          option - hours,
+        );
+
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        selectedHours = option;
+      }
+    }
+
+    const rows =
+      await getJSON<any[]>(
+        `/api/history/all?id=${encodeURIComponent(
+          uuid,
+        )}&hours=${selectedHours}`,
       );
-  }
 
-  const rows =
-    await getJSON<any[]>(
-      `/api/history/all?id=${encodeURIComponent(
-        uuid,
-      )}&hours=${selectedHours}`,
-    );
+    const records:
+      LoadRecord[] =
+      (rows || []).map(
+        (row) => {
+          const ramTotal =
+            mbToBytes(
+              row.ram_total,
+            );
 
-  const records: LoadRecord[] =
-    (rows || []).map((row) => {
-      const ramTotal =
-        mbToBytes(row.ram_total);
+          const ramUsed =
+            mbToBytes(
+              row.ram_used,
+            );
 
-      const ramUsed =
-        mbToBytes(row.ram_used);
+          const swapTotal =
+            mbToBytes(
+              row.swap_total,
+            );
 
-      const swapTotal =
-        mbToBytes(row.swap_total);
+          const swapUsed =
+            mbToBytes(
+              row.swap_used,
+            );
 
-      const swapUsed =
-        mbToBytes(row.swap_used);
+          const diskTotal =
+            mbToBytes(
+              row.disk_total,
+            );
 
-      const diskTotal =
-        mbToBytes(row.disk_total);
+          const diskUsed =
+            mbToBytes(
+              row.disk_used,
+            );
 
-      const diskUsed =
-        mbToBytes(row.disk_used);
+          const load =
+            parseLoad(
+              row.load_avg,
+            );
 
-      const load =
-        parseLoad(row.load_avg);
+          return {
+            time:
+              timestampToISOString(
+                row.timestamp,
+              ),
 
-      return {
-        time:
-          new Date(
-            number(row.timestamp),
-          ).toISOString(),
+            cpu:
+              number(row.cpu),
 
-        cpu: number(row.cpu),
+            gpu:
+              gpuUsage({
+                gpu_info:
+                  row.gpu_info,
+              }),
 
-        gpu: gpuUsage({
-          gpu_info: row.gpu_info,
-        } as CFSMServer),
+            /*
+             * ★ 历史数据同样必须返回已使用 Bytes
+             */
+            ram:
+              ramUsed,
 
-        ram:
-          ramTotal > 0
-            ? (ramUsed / ramTotal) * 100
-            : 0,
+            ram_total:
+              ramTotal,
 
-        ram_total: ramTotal,
+            swap:
+              swapUsed,
 
-        swap:
-          swapTotal > 0
-            ? (swapUsed / swapTotal) * 100
-            : 0,
+            swap_total:
+              swapTotal,
 
-        swap_total: swapTotal,
+            load:
+              load[0],
 
-        load: load[0],
+            disk:
+              diskUsed,
 
-        disk:
-          diskTotal > 0
-            ? (diskUsed / diskTotal) * 100
-            : 0,
+            disk_total:
+              diskTotal,
 
-        disk_total: diskTotal,
+            net_in:
+              number(
+                row.net_in_speed,
+              ),
 
-        net_in:
-          number(row.net_in_speed),
+            net_out:
+              number(
+                row.net_out_speed,
+              ),
 
-        net_out:
-          number(row.net_out_speed),
+            net_total_up:
+              number(row.net_tx),
 
-        net_total_up:
-          number(row.net_tx),
+            net_total_down:
+              number(row.net_rx),
 
-        net_total_down:
-          number(row.net_rx),
+            traffic_up:
+              number(row.net_tx),
 
-        traffic_up:
-          number(row.net_tx),
+            traffic_down:
+              number(row.net_rx),
 
-        traffic_down:
-          number(row.net_rx),
+            connections:
+              number(row.tcp_conn),
 
-        connections:
-          number(row.tcp_conn),
+            connections_udp:
+              number(row.udp_conn),
 
-        connections_udp:
-          number(row.udp_conn),
+            process:
+              number(row.processes),
+          };
+        },
+      );
 
-        process:
-          number(row.processes),
-      };
-    });
+    return {
+      count:
+        records.length,
 
-  return {
-    count: records.length,
-    records,
+      records,
+    };
   };
-};
 
 /* =========================================================
  * Ping 任务
- *
- * CFSM 没有 Komari 那种动态 Ping Task，
- * 目前固定映射四个运营商线路。
  * ========================================================= */
 
 export const getPingTasks =
@@ -865,78 +1339,100 @@ export const getPingTasks =
 
 /* =========================================================
  * Ping 历史
- *
- * CFSM /api/servers 自带最近一小时 ping 窗口，
- * 固定约 30 个点。
  * ========================================================= */
 
-export const getPingRecords = async (
-  uuid: string,
-  _hours: number,
-): Promise<{
-  count: number;
-  records: PingRecord[];
-  tasks?: PingTask[];
-}> => {
-  const response =
-    await getJSON<ServersResponse>(
-      "/api/servers",
-    );
+export const getPingRecords =
+  async (
+    uuid: string,
+    _hours: number,
+  ): Promise<{
+    count: number;
+    records: PingRecord[];
+    tasks?: PingTask[];
+  }> => {
+    const response =
+      await getJSON<ServersResponse>(
+        "/api/servers",
+      );
 
-  const server =
-    (response.servers || [])
-      .find((item) => item.id === uuid);
+    const server =
+      (
+        response.servers || []
+      ).find(
+        (item) =>
+          item.id === uuid,
+      );
 
-  if (!server) {
-    return {
-      count: 0,
-      records: [],
-      tasks: await getPingTasks(),
-    };
-  }
+    if (!server) {
+      return {
+        count: 0,
+        records: [],
+        tasks:
+          await getPingTasks(),
+      };
+    }
 
-  const records: PingRecord[] = [];
+    const records:
+      PingRecord[] = [];
 
-  for (const point of server.ping || []) {
-    const values = [
-      {
-        task_id: 1,
-        value: point.ct,
-      },
-      {
-        task_id: 2,
-        value: point.cu,
-      },
-      {
-        task_id: 3,
-        value: point.cm,
-      },
-      {
-        task_id: 4,
-        value: point.bd,
-      },
-    ];
+    for (
+      const point of
+      server.ping || []
+    ) {
+      const values = [
+        {
+          task_id: 1,
+          value: point.ct,
+        },
+        {
+          task_id: 2,
+          value: point.cu,
+        },
+        {
+          task_id: 3,
+          value: point.cm,
+        },
+        {
+          task_id: 4,
+          value: point.bd,
+        },
+      ];
 
-    for (const item of values) {
-      if (
-        item.value !== null &&
-        item.value !== undefined &&
-        item.value !== false
+      for (
+        const item of values
       ) {
+        if (
+          !validPing(
+            item.value,
+          )
+        ) {
+          continue;
+        }
+
         records.push({
-          task_id: item.task_id,
-          time: new Date(
-            point.ts,
-          ).toISOString(),
-          value: number(item.value),
+          task_id:
+            item.task_id,
+
+          time:
+            timestampToISOString(
+              point.ts,
+            ),
+
+          value:
+            number(
+              item.value,
+            ),
         });
       }
     }
-  }
 
-  return {
-    count: records.length,
-    records,
-    tasks: await getPingTasks(),
+    return {
+      count:
+        records.length,
+
+      records,
+
+      tasks:
+        await getPingTasks(),
+    };
   };
-};
