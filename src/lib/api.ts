@@ -532,7 +532,7 @@ function parseTrafficLimit(
  * ========================================================= */
 
 function parseGpuInfo(
-  server: CFSMServer,
+  server: Pick<CFSMServer, "gpu_info">,
 ): Array<{
   name?: string;
   info?: number | string;
